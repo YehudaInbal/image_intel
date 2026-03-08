@@ -23,6 +23,7 @@ def latitude(data: dict):
 def longitude(data: dict):
     pass
 
+
 def datatime(data: dict):
     pass
 
