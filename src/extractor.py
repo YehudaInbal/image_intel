@@ -1,5 +1,5 @@
 from PIL import Image
-from PIL.ExifTags import TAGS
+from PIL.ExifTags import TAGS, GPSTAGS
 from pathlib import Path
 import os
 
@@ -13,8 +13,18 @@ extractor.py - שליפת EXIF מתמונות
 
 
 def has_gps(data: dict):
-    pass
+    gps_raw=data.get("GPSInfo")
+    if not gps_raw or not isinstance(gps_raw, dict):
+        return False
+    gps_readable = {}
+    for key, value in gps_raw.items():
+        tag_name = GPSTAGS.get(key, key)
+        gps_readable[tag_name] = value
 
+    has_lat = "GPSLatitude" in gps_readable
+    has_lon = "GPSLongitude" in gps_readable
+
+    return has_lat and has_lon
 
 def latitude(data: dict):
     pass
