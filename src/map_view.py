@@ -17,7 +17,7 @@ import folium
 
 
 def sort_by_time(arr):
-    pass
+    return sorted(arr, key=lambda x: x.get("datetime", ""))
 
 
 def create_map(images_data):
@@ -30,20 +30,59 @@ def create_map(images_data):
     Returns:
         string של HTML (המפה)
     """
-    pass
+    gps_images = [
+        img for img in images_data
+        if img.get("has_gps") and img.get("latitude") is not None and img.get("longitude") is not None
+    ]
 
+    if not gps_images:
+        m = folium.Map(location=[32.0853, 34.7818], zoom_start=7)
+        return m._repr_html_()
+
+    gps_images = sort_by_time(gps_images)
+
+    avg_lat = sum(img["latitude"] for img in gps_images) / len(gps_images)
+    avg_lon = sum(img["longitude"] for img in gps_images) / len(gps_images)
+
+    m = folium.Map(location=[avg_lat, avg_lon], zoom_start=10)
+
+    for img in gps_images:
+        popup_text = (
+            f"Filename: {img.get('filename', 'Unknown')}<br>"
+            f"Camera: {img.get('camera_make', 'Unknown')} {img.get('camera_model', '')}<br>"
+            f"Date: {img.get('datetime', 'Unknown')}"
+        )
+
+        folium.Marker(
+            location=[img["latitude"], img["longitude"]],
+            popup=popup_text
+        ).add_to(m)
+
+    return m._repr_html_()
 
 
 if __name__ == "__main__":
-    # תיקון: fake_data הועבר לכאן מגוף הקובץ - כדי שלא ירוץ בכל import
     fake_data = [
-        {"filename": "test1.jpg", "latitude": 32.0853, "longitude": 34.7818,
-         "has_gps": True, "camera_make": "Samsung", "camera_model": "Galaxy S23",
-         "datetime": "2025-01-12 08:30:00"},
-        {"filename": "test2.jpg", "latitude": 31.7683, "longitude": 35.2137,
-         "has_gps": True, "camera_make": "Apple", "camera_model": "iPhone 15 Pro",
-         "datetime": "2025-01-13 09:00:00"},
+        {
+            "filename": "test1.jpg",
+            "latitude": 32.0853,
+            "longitude": 34.7818,
+            "has_gps": True,
+            "camera_make": "Samsung",
+            "camera_model": "Galaxy S23",
+            "datetime": "2025-01-12 08:30:00",
+        },
+        {
+            "filename": "test2.jpg",
+            "latitude": 31.7683,
+            "longitude": 35.2137,
+            "has_gps": True,
+            "camera_make": "Apple",
+            "camera_model": "iPhone 15 Pro",
+            "datetime": "2025-01-13 09:00:00",
+        },
     ]
+
     html = create_map(fake_data)
     with open("test_map.html", "w", encoding="utf-8") as f:
         f.write(html)
