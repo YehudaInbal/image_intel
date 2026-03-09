@@ -13,24 +13,26 @@ from datetime import datetime
 def _build_images_table(images_data):
     """בונה טבלת תמונות מפורטת."""
     if not images_data:
-        return "<p>אין נתונים.</p>"
+        return '<p class="empty-state">אין נתונים להצגה.</p>'
 
     rows = ""
     for img in images_data:
-        gps_cell = (
-            f'<span class="badge badge-gps">✓ {img["latitude"]:.4f}, {img["longitude"]:.4f}</span>'
-            if img.get("has_gps")
-            else '<span class="badge badge-no">✗ אין</span>'
-        )
+        if img.get("has_gps") and img.get("latitude") is not None and img.get("longitude") is not None:
+            gps_cell = f'<span class="badge badge-gps">✓ {img["latitude"]:.4f}, {img["longitude"]:.4f}</span>'
+        else:
+            gps_cell = '<span class="badge badge-no">✗ אין</span>'
+
         camera = img.get("camera_model") or img.get("camera_make") or "—"
         dt = img.get("datetime") or "—"
+
         rows += f"""
         <tr>
             <td class="td-filename">{img.get("filename", "—")}</td>
             <td>{dt}</td>
             <td>{camera}</td>
             <td>{gps_cell}</td>
-        </tr>"""
+        </tr>
+        """
 
     return f"""
     <div class="table-wrapper">
@@ -43,20 +45,21 @@ def _build_images_table(images_data):
                     <th>GPS</th>
                 </tr>
             </thead>
-            <tbody>{rows}</tbody>
+            <tbody>
+                {rows}
+            </tbody>
         </table>
-    </div>"""
+    </div>
+    """
 
 
 def _build_cameras_section(analysis):
-    """בונה סקשן מכשירים עם ספירה."""
+    """בונה סקשן מכשירים."""
     cameras = analysis.get("unique_cameras", [])
     if not cameras:
-        return "<p>לא זוהו מכשירים.</p>"
+        return '<p class="empty-state">לא זוהו מכשירים.</p>'
 
-    items = ""
-    for cam in cameras:
-        items += f'<div class="camera-chip">📷 {cam}</div>'
+    items = "".join(f'<div class="camera-chip">📷 {cam}</div>' for cam in cameras)
     return f'<div class="camera-grid">{items}</div>'
 
 
@@ -64,10 +67,17 @@ def _build_insights_section(analysis):
     """בונה סקשן תובנות."""
     insights = analysis.get("insights", [])
     if not insights:
-        return "<p>אין תובנות זמינות.</p>"
+        return '<p class="empty-state">אין תובנות זמינות.</p>'
 
     items = "".join(f'<li class="insight-item">{insight}</li>' for insight in insights)
     return f'<ul class="insights-list">{items}</ul>'
+
+
+def _build_timeline_section(timeline_html):
+    """בונה את סקשן ציר הזמן עם fallback אם אין תוכן."""
+    if not timeline_html or not str(timeline_html).strip():
+        return '<p class="empty-state">ציר הזמן אינו זמין כרגע.</p>'
+    return timeline_html
 
 
 def create_report(images_data, map_html, timeline_html, analysis):
@@ -76,29 +86,41 @@ def create_report(images_data, map_html, timeline_html, analysis):
 
     Args:
         images_data: רשימת מילונים מ-extract_all
-        map_html:     HTML string מ-create_map
+        map_html: HTML string מ-create_map
         timeline_html: HTML string מ-create_timeline
-        analysis:     מילון מ-analyze (total_images, images_with_gps,
-                      unique_cameras, date_range, insights)
+        analysis: מילון מ-analyze
 
     Returns:
-        HTML string מלא (תוכן דף שלם)
+        HTML string מלא
     """
     now = datetime.now().strftime("%d/%m/%Y %H:%M")
 
-    total        = analysis.get("total_images", 0)
-    gps_count    = analysis.get("images_with_gps", 0)
-    dt_count     = analysis.get("images_with_datetime", 0)
-    cameras      = analysis.get("unique_cameras", [])
-    date_range   = analysis.get("date_range", {})
+    total = analysis.get("total_images", 0)
+    gps_count = analysis.get("images_with_gps", 0)
+    dt_count = analysis.get("images_with_datetime", 0)
+    cameras = analysis.get("unique_cameras", [])
+    date_range = analysis.get("date_range", {})
 
     date_range_str = ""
     if date_range.get("start") and date_range.get("end"):
-        date_range_str = f'<p class="date-range">📅 {date_range["start"]} — {date_range["end"]}</p>'
+        date_range_str = f"""
+        <div class="date-range">
+            <span class="date-pill">📅 {date_range["start"]}</span>
+            <span class="date-separator">—</span>
+            <span class="date-pill">{date_range["end"]}</span>
+        </div>
+        """
 
-    images_table   = _build_images_table(images_data)
+    images_table = _build_images_table(images_data)
     cameras_section = _build_cameras_section(analysis)
     insights_section = _build_insights_section(analysis)
+    timeline_section = _build_timeline_section(timeline_html)
+
+    safe_map_html = (
+        (map_html or "")
+        .replace("&", "&amp;")
+        .replace("'", "&apos;")
+    )
 
     return f"""<!DOCTYPE html>
 <html lang="he" dir="rtl">
@@ -107,221 +129,362 @@ def create_report(images_data, map_html, timeline_html, analysis):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Intel — דו"ח מודיעין</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        *, *::before, *::after {{
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }}
 
         :root {{
-            --navy:   #0d1b2a;
-            --blue:   #1b4f72;
+            --navy: #0d1b2a;
+            --blue: #1b4f72;
             --accent: #2e86ab;
-            --light:  #e8f4fd;
-            --warn:   #e67e22;
-            --ok:     #27ae60;
-            --bg:     #f0f4f8;
-            --white:  #ffffff;
-            --text:   #1a1a2e;
-            --muted:  #6b7a8d;
-            --border: #d0dce9;
-            --radius: 12px;
-            --shadow: 0 2px 12px rgba(13,27,42,0.10);
+            --accent-soft: #64b5d6;
+            --light: #e8f4fd;
+            --bg: #f4f7fb;
+            --white: #ffffff;
+            --text: #1a1a2e;
+            --muted: #6b7a8d;
+            --border: #d8e1eb;
+            --ok-bg: #dff5e8;
+            --ok-text: #17653b;
+            --no-bg: #fde8e8;
+            --no-text: #a12b2b;
+            --radius: 16px;
+            --shadow: 0 8px 24px rgba(13, 27, 42, 0.08);
         }}
 
         body {{
             font-family: 'Heebo', sans-serif;
-            background: var(--bg);
+            background: linear-gradient(180deg, #eef3f8 0%, var(--bg) 100%);
             color: var(--text);
             line-height: 1.6;
         }}
 
-        /* ── HEADER ── */
         .report-header {{
-            background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
+            background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 60%, var(--accent) 100%);
             color: white;
-            padding: 48px 40px 36px;
+            padding: 56px 32px 40px;
             position: relative;
             overflow: hidden;
-        }}
-        .report-header::before {{
-            content: '';
-            position: absolute;
-            top: -60px; right: -60px;
-            width: 260px; height: 260px;
-            border-radius: 50%;
-            background: rgba(46,134,171,0.18);
-        }}
-        .report-header h1 {{
-            font-size: 2.4rem;
-            font-weight: 900;
-            letter-spacing: -0.5px;
-            position: relative;
-        }}
-        .report-header h1 span {{ color: #64d2ff; }}
-        .report-header .subtitle {{
-            font-size: 1rem;
-            font-weight: 300;
-            opacity: 0.75;
-            margin-top: 6px;
-        }}
-        .report-header .generated {{
-            position: absolute;
-            bottom: 18px; left: 40px;
-            font-size: 0.78rem;
-            opacity: 0.55;
+            box-shadow: 0 10px 26px rgba(13, 27, 42, 0.18);
         }}
 
-        /* ── LAYOUT ── */
-        .container {{
-            max-width: 1200px;
+        .report-header::before {{
+            content: "";
+            position: absolute;
+            top: -80px;
+            right: -80px;
+            width: 280px;
+            height: 280px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 50%;
+        }}
+
+        .report-header::after {{
+            content: "";
+            position: absolute;
+            bottom: -60px;
+            left: -60px;
+            width: 220px;
+            height: 220px;
+            background: rgba(100, 210, 255, 0.10);
+            border-radius: 50%;
+        }}
+
+        .header-inner {{
+            max-width: 1100px;
             margin: 0 auto;
-            padding: 32px 24px;
+            position: relative;
+            z-index: 1;
+        }}
+
+        .report-header h1 {{
+            font-size: 2.7rem;
+            font-weight: 900;
+            letter-spacing: -0.04em;
+        }}
+
+        .report-header h1 span {{
+            color: #8ddcff;
+        }}
+
+        .report-header .subtitle {{
+            margin-top: 10px;
+            font-size: 1.05rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }}
+
+        .report-header .generated {{
+            margin-top: 14px;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }}
+
+        .container {{
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 28px 18px 42px;
         }}
 
         .section {{
             background: var(--white);
             border-radius: var(--radius);
             box-shadow: var(--shadow);
-            padding: 28px 32px;
-            margin-bottom: 28px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(216, 225, 235, 0.65);
         }}
 
         .section-title {{
-            font-size: 1.1rem;
-            font-weight: 700;
+            font-size: 1.08rem;
+            font-weight: 800;
             color: var(--blue);
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            border-bottom: 2px solid var(--light);
+            margin-bottom: 18px;
             padding-bottom: 12px;
-            margin-bottom: 20px;
+            border-bottom: 2px solid var(--light);
+            letter-spacing: 0.01em;
         }}
 
-        /* ── STATS GRID ── */
         .stats-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
             gap: 16px;
         }}
+
         .stat-card {{
-            background: var(--light);
-            border-radius: 10px;
-            padding: 20px 16px;
+            background: linear-gradient(180deg, #f4faff 0%, var(--light) 100%);
+            border-radius: 14px;
+            padding: 22px 16px;
             text-align: center;
             border-top: 4px solid var(--accent);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
         }}
-        .stat-card .stat-number {{
-            font-size: 2.4rem;
+
+        .stat-number {{
+            font-size: 2.5rem;
             font-weight: 900;
             color: var(--blue);
             line-height: 1;
         }}
-        .stat-card .stat-label {{
-            font-size: 0.82rem;
-            color: var(--muted);
-            margin-top: 6px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }}
-        .date-range {{
-            text-align: center;
-            color: var(--muted);
+
+        .stat-label {{
+            margin-top: 8px;
             font-size: 0.9rem;
-            margin-top: 18px;
+            color: var(--muted);
+            font-weight: 700;
         }}
 
-        /* ── INSIGHTS ── */
+        .date-range {{
+            margin-top: 18px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }}
+
+        .date-pill {{
+            background: #f1f8ff;
+            border: 1px solid var(--border);
+            color: var(--blue);
+            padding: 7px 12px;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }}
+
+        .date-separator {{
+            color: var(--muted);
+            font-weight: 700;
+        }}
+
         .insights-list {{
             list-style: none;
             display: flex;
             flex-direction: column;
-            gap: 10px;
-        }}
-        .insight-item {{
-            background: var(--light);
-            border-right: 4px solid var(--accent);
-            padding: 12px 16px;
-            border-radius: 0 8px 8px 0;
-            font-size: 0.95rem;
+            gap: 12px;
         }}
 
-        /* ── CAMERAS ── */
+        .insight-item {{
+            background: linear-gradient(180deg, #f6fbff 0%, var(--light) 100%);
+            border-right: 5px solid var(--accent);
+            padding: 14px 16px;
+            border-radius: 10px 0 0 10px;
+            font-size: 0.96rem;
+        }}
+
         .camera-grid {{
             display: flex;
             flex-wrap: wrap;
             gap: 10px;
         }}
+
         .camera-chip {{
-            background: var(--navy);
+            background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
             color: white;
-            padding: 8px 16px;
-            border-radius: 24px;
-            font-size: 0.88rem;
-            font-weight: 600;
+            padding: 9px 16px;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            box-shadow: 0 4px 12px rgba(27, 79, 114, 0.18);
         }}
 
-        /* ── TABLE ── */
+        .map-wrapper {{
+            border-radius: 14px;
+            overflow: hidden;
+            background: #f8fbff;
+            border: 1px solid var(--border);
+            padding: 12px;
+        }}
+
+        .map-frame {{
+            width: 100%;
+            height: 560px;
+            border: none;
+            border-radius: 12px;
+            display: block;
+            background: white;
+        }}
+
+        .timeline-wrapper {{
+            background: #fbfdff;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 18px;
+        }}
+
         .table-wrapper {{
             overflow-x: auto;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
         }}
+
         table {{
             width: 100%;
             border-collapse: collapse;
-            font-size: 0.88rem;
+            font-size: 0.9rem;
+            background: white;
         }}
+
         th {{
-            background: var(--navy);
+            background: linear-gradient(135deg, var(--navy) 0%, var(--blue) 100%);
             color: white;
-            padding: 12px 14px;
+            padding: 13px 14px;
             text-align: right;
-            font-weight: 600;
-            letter-spacing: 0.03em;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
         }}
+
         td {{
-            padding: 10px 14px;
+            padding: 12px 14px;
             border-bottom: 1px solid var(--border);
-            color: var(--text);
             vertical-align: middle;
         }}
-        tr:last-child td {{ border-bottom: none; }}
-        tr:nth-child(even) td {{ background: #fafcfe; }}
-        .td-filename {{ font-family: monospace; font-size: 0.82rem; color: var(--blue); }}
 
-        /* ── BADGES ── */
+        tr:last-child td {{
+            border-bottom: none;
+        }}
+
+        tr:nth-child(even) td {{
+            background: #fafcff;
+        }}
+
+        .td-filename {{
+            font-family: monospace;
+            color: var(--blue);
+            font-size: 0.84rem;
+        }}
+
         .badge {{
             display: inline-block;
-            padding: 3px 10px;
-            border-radius: 12px;
+            padding: 4px 10px;
+            border-radius: 999px;
             font-size: 0.78rem;
-            font-weight: 700;
+            font-weight: 800;
+            white-space: nowrap;
         }}
-        .badge-gps  {{ background: #d4efdf; color: #1d6a3a; }}
-        .badge-no   {{ background: #fce8e8; color: #a93226; }}
 
-        /* ── MAP & TIMELINE wrappers ── */
-        .map-wrapper {{ border-radius: 8px; overflow: hidden; }}
-        .map-wrapper iframe, .map-wrapper > div {{ border-radius: 8px; }}
+        .badge-gps {{
+            background: var(--ok-bg);
+            color: var(--ok-text);
+        }}
 
-        /* ── FOOTER ── */
+        .badge-no {{
+            background: var(--no-bg);
+            color: var(--no-text);
+        }}
+
+        .empty-state {{
+            color: var(--muted);
+            background: #f8fbfe;
+            border: 1px dashed var(--border);
+            border-radius: 12px;
+            padding: 18px;
+            text-align: center;
+        }}
+
         .report-footer {{
             text-align: center;
             color: var(--muted);
-            font-size: 0.8rem;
-            padding: 24px;
+            font-size: 0.82rem;
+            padding: 10px 20px 30px;
+        }}
+
+        @media (max-width: 768px) {{
+            .report-header {{
+                padding: 42px 22px 30px;
+            }}
+
+            .report-header h1 {{
+                font-size: 2.1rem;
+            }}
+
+            .container {{
+                padding: 20px 12px 32px;
+            }}
+
+            .section {{
+                padding: 18px;
+            }}
+
+            .map-frame {{
+                height: 420px;
+            }}
+
+            .stats-grid {{
+                grid-template-columns: 1fr 1fr;
+            }}
+        }}
+
+        @media (max-width: 520px) {{
+            .stats-grid {{
+                grid-template-columns: 1fr;
+            }}
+
+            .map-frame {{
+                height: 340px;
+            }}
         }}
     </style>
 </head>
 <body>
 
 <div class="report-header">
-    <h1>Image <span>Intel</span></h1>
-    <p class="subtitle">דו"ח מודיעין חזותי — ניתוח נתוני EXIF מתמונות</p>
-    <span class="generated">נוצר ב־{now}</span>
+    <div class="header-inner">
+        <h1>Image <span>Intel</span></h1>
+        <p class="subtitle">דו"ח מודיעין חזותי — ניתוח נתוני EXIF מתמונות</p>
+        <div class="generated">נוצר ב־{now}</div>
+    </div>
 </div>
 
 <div class="container">
 
-    <!-- סיכום -->
     <div class="section">
         <div class="section-title">סיכום</div>
         <div class="stats-grid">
@@ -345,33 +508,30 @@ def create_report(images_data, map_html, timeline_html, analysis):
         {date_range_str}
     </div>
 
-    <!-- תובנות -->
     <div class="section">
         <div class="section-title">תובנות מרכזיות</div>
         {insights_section}
     </div>
 
-    <!-- מפה -->
     <div class="section">
         <div class="section-title">מפה אינטראקטיבית</div>
         <div class="map-wrapper">
-            {map_html}
+            <iframe class="map-frame" srcdoc='{safe_map_html}'></iframe>
         </div>
     </div>
 
-    <!-- ציר זמן -->
     <div class="section">
         <div class="section-title">ציר זמן</div>
-        {timeline_html}
+        <div class="timeline-wrapper">
+            {timeline_section}
+        </div>
     </div>
 
-    <!-- מכשירים -->
     <div class="section">
         <div class="section-title">מכשירים שזוהו</div>
         {cameras_section}
     </div>
 
-    <!-- טבלה מלאה -->
     <div class="section">
         <div class="section-title">כל התמונות — פירוט מלא</div>
         {images_table}
@@ -385,16 +545,28 @@ def create_report(images_data, map_html, timeline_html, analysis):
 </html>"""
 
 
-# ── בדיקה מהירה ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     fake_images = [
-        {"filename": "IMG_001.jpg", "datetime": "2025:01:12 08:30:00",
-         "camera_make": "Samsung", "camera_model": "Galaxy S23",
-         "has_gps": True, "latitude": 32.0853, "longitude": 34.7818},
-        {"filename": "IMG_002.jpg", "datetime": "2025:01:12 11:15:00",
-         "camera_make": "Apple", "camera_model": "iPhone 15 Pro",
-         "has_gps": False, "latitude": None, "longitude": None},
+        {
+            "filename": "IMG_001.jpg",
+            "datetime": "2025:01:12 08:30:00",
+            "camera_make": "Samsung",
+            "camera_model": "Galaxy S23",
+            "has_gps": True,
+            "latitude": 32.0853,
+            "longitude": 34.7818,
+        },
+        {
+            "filename": "IMG_002.jpg",
+            "datetime": "2025:01:12 11:15:00",
+            "camera_make": "Apple",
+            "camera_model": "iPhone 15 Pro",
+            "has_gps": False,
+            "latitude": None,
+            "longitude": None,
+        },
     ]
+
     fake_analysis = {
         "total_images": 2,
         "images_with_gps": 1,
@@ -402,17 +574,19 @@ if __name__ == "__main__":
         "unique_cameras": ["Samsung Galaxy S23", "Apple iPhone 15 Pro"],
         "date_range": {"start": "2025-01-12", "end": "2025-01-12"},
         "insights": [
-            "נמצאו 2 מכשירים שונים",
-            "תמונה אחת עם GPS",
-        ]
+            "נמצאו 2 מכשירים שונים.",
+            "תמונה אחת כוללת נתוני GPS.",
+        ],
     }
 
     html = create_report(
         fake_images,
-        map_html="<p style='color:gray'>[מפה תוצג כאן]</p>",
-        timeline_html="<p style='color:gray'>[ציר זמן יוצג כאן]</p>",
-        analysis=fake_analysis
+        map_html="<html><body><div style='padding:20px;font-family:Arial'>[מפה תוצג כאן]</div></body></html>",
+        timeline_html="<div style='padding:20px'>[ציר זמן יוצג כאן]</div>",
+        analysis=fake_analysis,
     )
+
     with open("test_report.html", "w", encoding="utf-8") as f:
         f.write(html)
-    print("✅  test_report.html נשמר")
+
+    print("✅ test_report.html נשמר")

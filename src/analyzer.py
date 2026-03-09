@@ -6,32 +6,28 @@ def analyze(images_data):
     """
     total_images = len(images_data)
 
-    # תיקון: בדיקת 'has_gps' במקום 'gps'
     images_with_gps = len([img for img in images_data if img.get("has_gps") is True])
 
     dated_images = [img for img in images_data if img.get("datetime")]
 
-    # חילוץ מכשירים ייחודיים (נשאר אותו דבר, כי המפתח תואם)
     cameras = list(set([img.get("camera_model") for img in images_data if img.get("camera_model")]))
 
+    sorted_images = []
     date_range = {"start": None, "end": None}
+
     if dated_images:
-        # מיון לפי תאריך כדי למצוא התחלה וסוף
         sorted_images = sorted(dated_images, key=lambda x: x["datetime"])
         date_range["start"] = sorted_images[0]["datetime"]
         date_range["end"] = sorted_images[-1]["datetime"]
 
     insights = []
 
-    # 1. תובנת מכשירים
     if len(cameras) > 1:
         insights.append(f"נמצאו {len(cameras)} מכשירים שונים - ייתכן שהסוכן החליף מכשירים.")
 
-    # 2. בדיקת רצף החלפות (עובד על הרשימה הממוינת)
     for i in range(1, len(sorted_images)):
         prev_cam = sorted_images[i - 1].get("camera_model")
         curr_cam = sorted_images[i].get("camera_model")
-        # מוודאים שיש דגם ושהוא השתנה מהתמונה הקודמת
         if prev_cam and curr_cam and prev_cam != curr_cam:
             insights.append(f"בתאריך {sorted_images[i]['datetime']} הסוכן עבר מ-{prev_cam} ל-{curr_cam}.")
 
