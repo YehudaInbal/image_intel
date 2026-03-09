@@ -15,6 +15,7 @@ map_view.py - יצירת מפה אינטראקטיבית
 
 
 
+from extractor import extract_all
 
 import folium
 
@@ -104,31 +105,16 @@ def create_map(images_data):
 
 
 if __name__ == "__main__":
-    fake_data = [
-        {
-            "filename": "test1.jpg",
-            "latitude": 32.0853,
-            "longitude": 34.7818,
-            "has_gps": True,
-            "camera_make": "Samsung",
-            "camera_model": "Galaxy S23",
-            "datetime": "2025-01-12 08:30:00",
-        },
-        {
-            "filename": "test2.jpg",
-            "latitude": 31.7683,
-            "longitude": 35.2137,
-            "has_gps": True,
-            "camera_make": "Apple",
-            "camera_model": "iPhone 15 Pro",
-            "datetime": "2025-01-13 09:00:00",
-        },
-    ]
 
-    html = create_map(fake_data)
+
+    data = extract_all("../images")
+    html = create_map(data)
+
     with open("test_map.html", "w", encoding="utf-8") as f:
         f.write(html)
 
     print("Map saved to test_map.html")
+
+
 
 
