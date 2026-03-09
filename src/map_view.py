@@ -12,7 +12,7 @@ map_view.py - יצירת מפה אינטראקטיבית
 5. תיקון color_index - היה מתקדם על כל תמונה במקום רק על מכשיר חדש
 6. הוספת מקרא מכשירים
 """
-
+from extractor import extract_all
 
 
 from extractor import extract_all
@@ -105,16 +105,25 @@ def create_map(images_data):
 
 
 if __name__ == "__main__":
+<<<<<<< Updated upstream
 
 
     data = extract_all("../images")
     html = create_map(data)
 
+=======
+    data = extract_all("../images")  # ou le chemin vers ton dossier photos
+    html = create_map(data)
+
+>>>>>>> Stashed changes
     with open("test_map.html", "w", encoding="utf-8") as f:
         f.write(html)
 
     print("Map saved to test_map.html")
 
+<<<<<<< Updated upstream
 
 
 
+=======
+>>>>>>> Stashed changes
