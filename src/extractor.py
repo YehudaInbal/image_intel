@@ -2,7 +2,8 @@ from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 from pathlib import Path
 import re
-
+import base64
+import io
 
 def sanitize_to_ascii(text):
     """
@@ -92,7 +93,25 @@ def dms_to_decimal(dms_tuple, ref):
     except (TypeError, ZeroDivisionError, IndexError):
         return None
 
+def image_to_base64(image_path, max_size=(220, 220)):
+    """Convertit une image en base64 pour l'afficher dans le popup HTML."""
+    try:
+        with Image.open(image_path) as img:
+            img = img.copy()
+            img.thumbnail(max_size)
 
+            if img.mode not in ("RGB", "L"):
+                img = img.convert("RGB")
+
+            buffer = io.BytesIO()
+            img.save(buffer, format="JPEG", quality=85)
+            encoded = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            return f"data:image/jpeg;base64,{encoded}"
+    except Exception:
+        return None
+
+
+    
 def extract_metadata(image_path):
     """
     Extracts EXIF from a single image and builds a comprehensive data dictionary.
@@ -135,7 +154,8 @@ def extract_metadata(image_path):
                 "longitude": longitude(full_data),
                 "camera_make": camera_make(full_data),
                 "camera_model": camera_model(full_data),
-                "has_gps": has_gps(full_data)
+                "has_gps": has_gps(full_data),
+                "image_base64": image_to_base64(image_path)
             }
 
     except Exception:
@@ -146,8 +166,11 @@ def extract_metadata(image_path):
             "longitude": None,
             "camera_make": None,
             "camera_model": None,
-            "has_gps": False
+            "has_gps": False,
+            "image_base64": image_to_base64(image_path)
         }
+
+
 
 
 def extract_all(folder_path):

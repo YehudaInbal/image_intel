@@ -69,6 +69,15 @@ def create_map(images_data):
         lon = img["longitude"]
         points.append([lat, lon])
 
+        image_html = ""
+        if img.get("image_base64"):
+            image_html = f"""
+            <div style="margin-top:10px; text-align:center;">
+                <img src="{img['image_base64']}" 
+                     style="max-width:200px; max-height:200px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.2);">
+            </div>
+            """
+
         popup_html = f"""
         <div style="font-family: sans-serif; width: 220px;">
             <h4 style="margin: 0 0 10px 0;">📷 {img.get("filename", "Unknown")}</h4>
@@ -79,6 +88,7 @@ def create_map(images_data):
                 <b>Coordinates:</b><br>
                 {lat:.6f}, {lon:.6f}
             </p>
+            {image_html}
         </div>
         """
 
