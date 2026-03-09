@@ -1,5 +1,5 @@
 
-# from timeline import create_timeline
+from timeline import create_timeline
 from analyzer import analyze
 from report import create_report
 from flask import Flask, render_template, request
@@ -12,13 +12,7 @@ from map_view import create_map
 app = Flask(__name__)
 
 
-def fake_create_timeline(images_data):
-    return """
-    <div style="padding: 20px; background: white; border-radius: 8px;">
-        <h3>Timeline placeholder</h3>
-        <p>המודול של ציר הזמן עדיין בבנייה.</p>
-    </div>
-    """
+
 
 
 
@@ -53,11 +47,11 @@ def analyze_images():
 
 
         map_html = create_map(images_data)
-        timeline_html = fake_create_timeline(images_data)
 
 
-        # map_html = create_map(images_data)
-        # timeline_html = create_timeline(images_data)
+
+
+        timeline_html = create_timeline(images_data)
         analysis = analyze(images_data)
         report_html = create_report(images_data, map_html, timeline_html, analysis)
         return report_html
