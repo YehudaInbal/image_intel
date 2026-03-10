@@ -12,11 +12,9 @@ map_view.py - יצירת מפה אינטראקטיבית
 5. תיקון color_index - היה מתקדם על כל תמונה במקום רק על מכשיר חדש
 6. הוספת מקרא מכשירים
 """
-from extractor import extract_all
-
 
 from extractor import extract_all
-
+from branca.element import Element
 import folium
 
 
@@ -55,6 +53,8 @@ def create_map(images_data):
     color_index = 0
 
     points = []
+    cluster_counts = {}
+    cluster_exact_coords = {}
 
     for i, img in enumerate(gps_images, start=1):
         device = img.get("camera_model") or img.get("camera_make") or "Unknown"
@@ -68,12 +68,17 @@ def create_map(images_data):
         lat = img["latitude"]
         lon = img["longitude"]
         points.append([lat, lon])
+        cluster_key = (round(lat, 2), round(lon, 2))
+        cluster_counts[cluster_key] = cluster_counts.get(cluster_key, 0) + 1
+
+        if cluster_key not in cluster_exact_coords:
+            cluster_exact_coords[cluster_key] = (lat, lon)
 
         image_html = ""
         if img.get("image_base64"):
             image_html = f"""
             <div style="margin-top:10px; text-align:center;">
-                <img src="{img['image_base64']}" 
+                <img src="{img['image_base64']}"
                      style="max-width:200px; max-height:200px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.2);">
             </div>
             """
@@ -111,18 +116,66 @@ def create_map(images_data):
             tooltip="מסלול כרונולוגי"
         ).add_to(m)
 
+    map_name = m.get_name()
+    for cluster_key, count in cluster_counts.items():
+        if count >= 3:
+            cluster_lat, cluster_lon = cluster_exact_coords[cluster_key]
+
+            folium.Circle(
+                location=[cluster_lat, cluster_lon],
+                radius=600,  # rayon en mètres
+                color="crimson",
+                fill=True,
+                fill_opacity=0.12,
+                popup=f"ריכוז של {count} תמונות באזור {cluster_key[0]}, {cluster_key[1]}"
+            ).add_to(m)
+
+    focus_script = """
+    <script>
+    window.addEventListener("message", function(event) {
+
+        const data = event.data;
+        if (!data || data.type !== "focusMap") return;
+
+        const lat = data.lat;
+        const lon = data.lon;
+
+        if (typeof lat !== "number" || typeof lon !== "number") return;
+
+        // Find the leaflet map instance dynamically
+        let leafletMap = null;
+
+        for (let key in window) {
+            if (window[key] instanceof L.Map) {
+                leafletMap = window[key];
+                break;
+            }
+        }
+
+        if (!leafletMap) return;
+
+        leafletMap.flyTo([lat, lon], 15, {
+            animate: true,
+            duration: 1.5
+        });
+
+    });
+    </script>
+    """
+
+    m.get_root().html.add_child(Element(focus_script))
+
     return m.get_root().render()
 
 
 if __name__ == "__main__":
+    data = extract_all("../images")
+    html = create_map(data)
 
-        data = extract_all("../images")
-        html = create_map(data)
+    with open("test_map.html", "w", encoding="utf-8") as f:
+        f.write(html)
 
-        with open("test_map.html", "w", encoding="utf-8") as f:
-            f.write(html)
-
-        print("Map saved to test_map.html")
+    print("Map saved to test_map.html")
 
 
 

@@ -64,13 +64,32 @@ def _build_cameras_section(analysis):
 
 
 def _build_insights_section(analysis):
-    """בונה סקשן תובנות."""
+    """בונה סקשן תובנות עם 2 פריטים גלויים וכפתור View more."""
     insights = analysis.get("insights", [])
     if not insights:
         return '<p class="empty-state">אין תובנות זמינות.</p>'
 
-    items = "".join(f'<li class="insight-item">{insight}</li>' for insight in insights)
-    return f'<ul class="insights-list">{items}</ul>'
+    items = ""
+    for i, insight in enumerate(insights):
+        hidden_class = " hidden-insight" if i >= 2 else ""
+        items += f'<li class="insight-item{hidden_class}">{insight}</li>'
+
+    button_html = ""
+    if len(insights) > 2:
+        button_html = """
+        <button type="button" class="insights-toggle-btn" onclick="toggleInsights(this)">
+            View more
+        </button>
+        """
+
+    return f"""
+    <div class="insights-wrapper">
+        <ul class="insights-list">
+            {items}
+        </ul>
+        {button_html}
+    </div>
+    """
 
 
 def _build_timeline_section(timeline_html):
@@ -136,7 +155,17 @@ def create_report(images_data, map_html, timeline_html, analysis):
             margin: 0;
             padding: 0;
         }}
-
+        .coord-link {{
+            color: var(--accent);
+            font-weight: 800;
+            text-decoration: none;
+            border-bottom: 1px dashed var(--accent);
+        }}
+        
+        .coord-link:hover {{
+            color: var(--blue);
+            border-bottom-color: var(--blue);
+        }}
         :root {{
             --navy: #0d1b2a;
             --blue: #1b4f72;
@@ -155,6 +184,7 @@ def create_report(images_data, map_html, timeline_html, analysis):
             --radius: 16px;
             --shadow: 0 8px 24px rgba(13, 27, 42, 0.08);
         }}
+    
 
         body {{
             font-family: 'Heebo', sans-serif;
@@ -471,7 +501,33 @@ def create_report(images_data, map_html, timeline_html, analysis):
                 height: 340px;
             }}
         }}
-    </style>
+        .insights-wrapper {{
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}}
+
+        .hidden-insight {{
+            display: none;
+        }}
+        
+        .insights-toggle-btn {{
+            align-self: flex-start;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%);
+            color: white;
+            border: none;
+            border-radius: 999px;
+            padding: 9px 16px;
+            font-size: 0.88rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(27, 79, 114, 0.18);
+        }}
+        
+        .insights-toggle-btn:hover {{
+            opacity: 0.92;
+        }}
+</style>
 </head>
 <body>
 
@@ -513,8 +569,8 @@ def create_report(images_data, map_html, timeline_html, analysis):
         {insights_section}
     </div>
 
-    <div class="section">
-        <div class="section-title">מפה אינטראקטיבית</div>
+    <div class="section" id="map-section">
+    <div class="section-title">מפה אינטראקטיבית</div>
         <div class="map-wrapper">
             <iframe class="map-frame" srcdoc='{safe_map_html}'></iframe>
         </div>
@@ -540,7 +596,48 @@ def create_report(images_data, map_html, timeline_html, analysis):
 </div>
 
 <div class="report-footer">Image Intel &nbsp;|&nbsp; האקתון 2025</div>
+<script>
+document.addEventListener("click", function (event) {{
+    const link = event.target.closest(".coord-link");
+    if (!link) return;
 
+    event.preventDefault();
+
+    const lat = parseFloat(link.dataset.lat);
+    const lon = parseFloat(link.dataset.lon);
+
+    const mapSection = document.getElementById("map-section");
+    if (mapSection) {{
+        mapSection.scrollIntoView({{ behavior: "smooth", block: "start" }});
+    }}
+
+    const iframe = document.querySelector(".map-frame");
+    if (!iframe || !iframe.contentWindow) return;
+
+    setTimeout(() => {{
+        iframe.contentWindow.postMessage({{
+            type: "focusMap",
+            lat: lat,
+            lon: lon
+        }}, "*");
+    }}, 500);
+}});
+</script>
+<script>
+function toggleInsights(button) {{
+    const wrapper = button.closest(".insights-wrapper");
+    if (!wrapper) return;
+
+    const hiddenItems = wrapper.querySelectorAll(".hidden-insight");
+    const isHidden = hiddenItems.length > 0 && hiddenItems[0].style.display !== "list-item";
+
+    hiddenItems.forEach(item => {{
+        item.style.display = isHidden ? "list-item" : "none";
+    }});
+
+    button.textContent = isHidden ? "View less" : "View more";
+}}
+</script>
 </body>
 </html>"""
 
