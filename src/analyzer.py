@@ -324,7 +324,7 @@ def detect_location_revisits(images_with_gps):
     for img in sorted_imgs:
         lat = img.get("latitude")
         lon = img.get("longitude")
-        location_key = coords_to_location_key(lat, lon, precision=1)
+        location_key = coords_to_location_key(lat, lon, precision=2)
 
         if not location_key or lat is None or lon is None:
             continue
@@ -409,7 +409,7 @@ def detect_time_gaps(dated_images, threshold_hours=12):
 
 from collections import Counter
 
-def detect_geographic_clusters(images_with_gps, precision=1, min_images=3):
+def detect_geographic_clusters(images_with_gps, precision=2, min_images=3):
     """
     מזהה ריכוזים גיאוגרפיים לפי קואורדינטות מקורבות.
     אם יש לפחות min_images תמונות באותו אזור - מחזיר תובנה עם קישור למפה.

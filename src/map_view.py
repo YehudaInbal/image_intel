@@ -68,7 +68,7 @@ def create_map(images_data):
         lat = img["latitude"]
         lon = img["longitude"]
         points.append([lat, lon])
-        cluster_key = (round(lat, 1), round(lon, 1))
+        cluster_key = (round(lat, 2), round(lon, 2))
         cluster_counts[cluster_key] = cluster_counts.get(cluster_key, 0) + 1
 
         if cluster_key not in cluster_exact_coords:
@@ -122,7 +122,7 @@ def create_map(images_data):
             cluster_points = [
                 (img["latitude"], img["longitude"])
                 for img in gps_images
-                if (round(img["latitude"], 1), round(img["longitude"], 1)) == cluster_key
+                if (round(img["latitude"], 2), round(img["longitude"], 2)) == cluster_key
             ]
 
             center_lat = sum(lat for lat, lon in cluster_points) / len(cluster_points)
@@ -130,7 +130,7 @@ def create_map(images_data):
 
             folium.Circle(
                 location=[center_lat, center_lon],
-                radius=3000,
+                radius=600,
                 color="crimson",
                 fill=True,
                 fill_opacity=0.12,

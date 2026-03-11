@@ -182,7 +182,7 @@ def extract_all(folder_path):
         return []
 
     for path in folder.glob("*"):
-        if path.is_file() and path.suffix.lower() in ['.jpg', '.jpeg']:
+        if path.is_file() and path.suffix.lower() in ['.jpg', '.jpeg','.png']:
             metadata = extract_metadata(path)
             all_metadata.append(metadata)
 

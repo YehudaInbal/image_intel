@@ -49,12 +49,30 @@ def analyze_images():
 
             images_data = extract_all(folder_path)
 
+    else:
+        photos = request.files.getlist("photos")
+
+        if not photos or all(photo.filename == "" for photo in photos):
+            return "לא נבחרו תמונות", 400
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            for photo in photos:
+                if photo and photo.filename:
+                    save_path = os.path.join(temp_dir, photo.filename)
+                    photo.save(save_path)
+
+            images_data = extract_all(temp_dir)
+
+    if not images_data:
+        return "לא נמצאו תמונות תקינות", 400
+
     map_html = create_map(images_data)
     timeline_html = create_timeline(images_data)
     analysis = analyze(images_data)
     report_html = create_report(images_data, map_html, timeline_html, analysis)
-
     return report_html
+
+
 
 
 if __name__ == "__main__":
