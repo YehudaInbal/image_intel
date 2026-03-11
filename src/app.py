@@ -25,34 +25,29 @@ def analyze_images():
     if source_type == "project":
         project_folder = request.form.get("project_folder", "ready")
 
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
         allowed_folders = {
-            "ready": "../images/ready",
-            "sample_data": "../images/sample_data",
-            "uploads": "../images/uploads",
+            "ready": os.path.join(BASE_DIR, "..", "images", "ready"),
+            "sample_data": os.path.join(BASE_DIR, "..", "images", "sample_data"),
+            "uploads": os.path.join(BASE_DIR, "..", "images", "uploads"),
+            "all": os.path.join(BASE_DIR, "..", "images"),
         }
 
-        folder_path = allowed_folders.get(project_folder)
-        if not folder_path or not os.path.isdir(folder_path):
-            return "תיקיית פרויקט לא נמצאה", 400
+        if project_folder == "all":
+            images_data = []
 
-        images_data = extract_all(folder_path)
+            for folder in ["ready", "sample_data", "uploads"]:
+                path = allowed_folders[folder]
+                if os.path.isdir(path):
+                    images_data.extend(extract_all(path))
+        else:
+            folder_path = allowed_folders.get(project_folder)
 
-    else:
-        photos = request.files.getlist("photos")
+            if not folder_path or not os.path.isdir(folder_path):
+                return "תיקיית פרויקט לא נמצאה", 400
 
-        if not photos or all(photo.filename == "" for photo in photos):
-            return "לא נבחרו תמונות", 400
-
-        with tempfile.TemporaryDirectory() as temp_dir:
-            for photo in photos:
-                if photo and photo.filename:
-                    save_path = os.path.join(temp_dir, photo.filename)
-                    photo.save(save_path)
-
-            images_data = extract_all(temp_dir)
-
-    if not images_data:
-        return "לא נמצאו תמונות תקינות", 400
+            images_data = extract_all(folder_path)
 
     map_html = create_map(images_data)
     timeline_html = create_timeline(images_data)
