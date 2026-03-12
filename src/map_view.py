@@ -64,56 +64,59 @@ def create_map(images_data):
             color_index += 1
 
         marker_color = device_colors[device]
-
         lat = img["latitude"]
         lon = img["longitude"]
         points.append([lat, lon])
-        cluster_key = (round(lat, 2), round(lon, 2))
-        cluster_counts[cluster_key] = cluster_counts.get(cluster_key, 0) + 1
 
-        if cluster_key not in cluster_exact_coords:
-            cluster_exact_coords[cluster_key] = (lat, lon)
+        # --- Start of updated hover feature logic ---
 
-        image_html = ""
+        # Create a compact HTML string for the hover tooltip (the small square)
+        # We use the base64 data already extracted by extractor.py
+        hover_tooltip_html = ""
         if img.get("image_base64"):
-            image_html = f"""
-            <div style="margin-top:10px; text-align:center;">
-                <img src="{img['image_base64']}"
-                     style="max-width:200px; max-height:200px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.2);">
-            </div>
-            """
+            hover_tooltip_html = f"""
+                <div style="width: 140px; text-align: center; font-family: sans-serif; padding: 5px;">
+                    <img src="{img['image_base64']}" 
+                         style="width: 100%; height: auto; border-radius: 4px; box-shadow: 0 2px 6px rgba(0,0,0,0.3);">
+                    <div style="font-size: 11px; margin-top: 5px; font-weight: bold; color: #333;">
+                        {img.get("filename", "Unknown")}
+                    </div>
+                </div>
+                """
+        else:
+            # Fallback to simple text if image is missing
+            hover_tooltip_html = f"<strong>{img.get('filename')}</strong><br>{device}"
+
+        # Build the detailed popup HTML for when the user actually clicks the marker
+        image_popup_html = ""
+        if img.get("image_base64"):
+            image_popup_html = f"""
+                <div style="margin-top:10px; text-align:center;">
+                    <img src="{img['image_base64']}"
+                         style="max-width:200px; max-height:200px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.2);">
+                </div>
+                """
 
         popup_html = f"""
-        <div style="font-family: sans-serif; width: 220px;">
-            <h4 style="margin: 0 0 10px 0;">📷 {img.get("filename", "Unknown")}</h4>
-            <p style="margin: 5px 0;"><b>Photo #:</b> {i}</p>
-            <p style="margin: 5px 0;"><b>Time:</b> {img.get("datetime", "Unknown")}</p>
-            <p style="margin: 5px 0;"><b>Device:</b> {device}</p>
-            <p style="margin: 5px 0;">
-                <b>Coordinates:</b><br>
-                {lat:.6f}, {lon:.6f}
-            </p>
-            {image_html}
-        </div>
-        """
+            <div style="font-family: sans-serif; width: 220px;">
+                <h4 style="margin: 0 0 10px 0;">📷 {img.get("filename", "Unknown")}</h4>
+                <p style="margin: 5px 0;"><b>Photo #:</b> {i}</p>
+                <p style="margin: 5px 0;"><b>Time:</b> {img.get("datetime", "Unknown")}</p>
+                <p style="margin: 5px 0;"><b>Device:</b> {device}</p>
+                <p style="margin: 5px 0;"><b>Coordinates:</b><br>{lat:.6f}, {lon:.6f}</p>
+                {image_popup_html}
+            </div>
+            """
+        # --- End of updated hover feature logic ---
 
         popup = folium.Popup(popup_html, max_width=250)
-        tooltip_text = f"{device} - {img.get('datetime', 'Unknown')}"
 
+        # Apply the tooltip_html to show the image on hover
         folium.Marker(
             location=[lat, lon],
             popup=popup,
-            tooltip=tooltip_text,
+            tooltip=hover_tooltip_html,
             icon=folium.Icon(color=marker_color, icon="camera", prefix="fa"),
-        ).add_to(m)
-
-    if len(points) > 1:
-        folium.PolyLine(
-            points,
-            color="blue",
-            weight=3,
-            opacity=0.6,
-            tooltip="מסלול כרונולוגי"
         ).add_to(m)
 
     for cluster_key, count in cluster_counts.items():
