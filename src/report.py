@@ -8,7 +8,9 @@ report.py - הרכבת דו"ח HTML סופי
 """
 
 from datetime import datetime
-
+import re
+import json
+from html import escape
 
 def _build_images_table(images_data):
     """בונה טבלת תמונות מפורטת."""
@@ -51,7 +53,70 @@ def _build_images_table(images_data):
         </table>
     </div>
     """
+def _build_image_lookup(images_data):
+    """
+    Builds a lookup dict:
+    filename -> image_base64
+    """
+    lookup = {}
+    for img in images_data:
+        filename = img.get("filename")
+        image_base64 = img.get("image_base64")
+        if filename and image_base64:
+            lookup[filename] = image_base64
+    return lookup
 
+
+def _replace_filenames_with_buttons(text, image_lookup):
+    """
+    Replaces filenames inside insight text with clickable buttons.
+    Supports names like IMG_1234.JPG / photo.png / file-name.jpeg
+    """
+    if not text:
+        return ""
+
+    pattern = r'([A-Za-z0-9_\-\.]+\.(?:jpg|jpeg|png|JPG|JPEG|PNG))'
+
+    def repl(match):
+        filename = match.group(1)
+        if filename in image_lookup:
+            safe_filename = escape(filename)
+            return (
+                f'<button type="button" class="file-image-btn" '
+                f'onclick="openImageModal([&quot;{safe_filename}&quot;])">'
+                f'{safe_filename}</button>'
+            )
+        return escape(filename)
+
+    return re.sub(pattern, repl, text)
+
+
+def _replace_group_line_with_gallery_buttons(text, image_lookup):
+    """
+    Special handling for lines containing multiple filenames:
+    creates one button per image and a 'view all' button if more than one exists.
+    """
+    if not text:
+        return ""
+
+    pattern = r'([A-Za-z0-9_\-\.]+\.(?:jpg|jpeg|png|JPG|JPEG|PNG))'
+    filenames = re.findall(pattern, text)
+
+    unique_existing = []
+    for filename in filenames:
+        if filename in image_lookup and filename not in unique_existing:
+            unique_existing.append(filename)
+
+    processed = _replace_filenames_with_buttons(text, image_lookup)
+
+    if len(unique_existing) > 1:
+        json_filenames = json.dumps(unique_existing, ensure_ascii=False).replace('"', '&quot;')
+        processed += (
+            f' <button type="button" class="file-image-btn group-view-btn" '
+            f'onclick="openImageModal({json_filenames})">הצג את כולן</button>'
+        )
+
+    return processed
 
 def _build_cameras_section(analysis):
     """בונה סקשן מכשירים."""
@@ -63,19 +128,42 @@ def _build_cameras_section(analysis):
     return f'<div class="camera-grid">{items}</div>'
 
 
-def _build_insights_section(analysis):
-    """בונה סקשן תובנות עם 2 פריטים גלויים וכפתור View more."""
+def _build_timeline_section(timeline_html):
+    if not timeline_html:
+        return ""
+
+    return f"""
+    <div class="section">
+        <h2>Timeline</h2>
+        {timeline_html}
+    </div>
+    """
+
+def _build_insights_section(analysis, images_data):
+    """בונה סקשן תובנות כלליות עם 2 פריטים גלויים וכפתור View more."""
     insights = analysis.get("insights", [])
-    if not insights:
+    image_lookup = _build_image_lookup(images_data)
+
+    filtered_insights = [
+        insight for insight in insights
+        if not (
+            "ייתכן שאותו אדם הופיע" in insight
+            or "קבוצת דמיון" in insight
+            or "זוהתה אינדיקציה לדמות חוזרת" in insight
+        )
+    ]
+
+    if not filtered_insights:
         return '<p class="empty-state">אין תובנות זמינות.</p>'
 
     items = ""
-    for i, insight in enumerate(insights):
+    for i, insight in enumerate(filtered_insights):
         hidden_class = " hidden-insight" if i >= 2 else ""
-        items += f'<li class="insight-item{hidden_class}">{insight}</li>'
+        processed_insight = _replace_group_line_with_gallery_buttons(insight, image_lookup)
+        items += f'<li class="insight-item{hidden_class}">{processed_insight}</li>'
 
     button_html = ""
-    if len(insights) > 2:
+    if len(filtered_insights) > 2:
         button_html = """
         <button type="button" class="insights-toggle-btn" onclick="toggleInsights(this)">
             View more
@@ -92,11 +180,38 @@ def _build_insights_section(analysis):
     """
 
 
-def _build_timeline_section(timeline_html):
-    """בונה את סקשן ציר הזמן עם fallback אם אין תוכן."""
-    if not timeline_html or not str(timeline_html).strip():
-        return '<p class="empty-state">ציר הזמן אינו זמין כרגע.</p>'
-    return timeline_html
+def _build_similar_people_section(analysis, images_data):
+    """
+    Builds a dedicated section for repeated / similar face insights.
+    """
+    all_insights = analysis.get("insights", [])
+    image_lookup = _build_image_lookup(images_data)
+
+    similar_people_insights = [
+        insight for insight in all_insights
+        if (
+            "ייתכן שאותו אדם הופיע" in insight
+            or "קבוצת דמיון" in insight
+            or "זוהתה אינדיקציה לדמות חוזרת" in insight
+        )
+    ]
+
+    if not similar_people_insights:
+        return '<p class="empty-state">לא זוהו דמויות דומות בין התמונות.</p>'
+
+    items = ""
+    for insight in similar_people_insights:
+        processed_insight = _replace_group_line_with_gallery_buttons(insight, image_lookup)
+        items += f'<li class="insight-item">{processed_insight}</li>'
+
+    return f"""
+    <div class="insights-wrapper">
+        <ul class="insights-list">
+            {items}
+        </ul>
+    </div>
+    """
+
 
 
 def create_report(images_data, map_html, timeline_html, analysis):
@@ -132,8 +247,10 @@ def create_report(images_data, map_html, timeline_html, analysis):
 
     images_table = _build_images_table(images_data)
     cameras_section = _build_cameras_section(analysis)
-    insights_section = _build_insights_section(analysis)
+    insights_section = _build_insights_section(analysis, images_data)
+    similar_people_section = _build_similar_people_section(analysis, images_data)
     timeline_section = _build_timeline_section(timeline_html)
+    image_lookup_json = json.dumps(_build_image_lookup(images_data), ensure_ascii=False)
 
     safe_map_html = (
         (map_html or "")
@@ -161,6 +278,98 @@ def create_report(images_data, map_html, timeline_html, analysis):
             text-decoration: none;
             border-bottom: 1px dashed var(--accent);
         }}
+            .file-image-btn {{
+        background: linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%);
+        color: white;
+        border: none;
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        cursor: pointer;
+        margin: 2px 4px 2px 0;
+        box-shadow: 0 4px 12px rgba(27, 79, 114, 0.18);
+    }}
+    
+    .file-image-btn:hover {{
+        opacity: 0.92;
+    }}
+    
+    .group-view-btn {{
+        background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);
+    }}
+    
+    .image-modal-overlay {{
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.82);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 99999;
+        padding: 24px;
+    }}
+    
+    .image-modal-overlay.active {{
+        display: flex;
+    }}
+    
+    .image-modal-box {{
+        background: white;
+        border-radius: 18px;
+        max-width: 1000px;
+        width: 100%;
+        max-height: 90vh;
+        overflow: auto;
+        padding: 18px;
+        position: relative;
+    }}
+    
+    .image-modal-close {{
+        position: sticky;
+        top: 0;
+        float: left;
+        background: #0f172a;
+        color: white;
+        border: none;
+        border-radius: 999px;
+        padding: 8px 14px;
+        font-size: 0.85rem;
+        font-weight: 700;
+        cursor: pointer;
+        margin-bottom: 12px;
+        z-index: 2;
+    }}
+    
+    .image-gallery {{
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 16px;
+        clear: both;
+    }}
+    
+    .image-card {{
+        background: #f8fafc;
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 12px;
+        text-align: center;
+    }}
+    
+    .image-card img {{
+        max-width: 100%;
+        max-height: 320px;
+        border-radius: 10px;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    }}
+    
+    .image-card .caption {{
+        margin-top: 8px;
+        font-size: 0.85rem;
+        color: var(--blue);
+        font-weight: 700;
+        word-break: break-word;
+    }}
 
         .coord-link:hover {{
             color: var(--blue);
@@ -586,6 +795,7 @@ def create_report(images_data, map_html, timeline_html, analysis):
         <button type="button" class="tab-btn" data-tab="timeline-section" onclick="showTab('timeline-section', this)">ציר זמן</button>
         <button type="button" class="tab-btn" data-tab="cameras-section" onclick="showTab('cameras-section', this)">מכשירים</button>
         <button type="button" class="tab-btn" data-tab="images-section" onclick="showTab('images-section', this)">תמונות</button>
+        <button type="button" class="tab-btn" data-tab="similar-people-section" onclick="showTab('similar-people-section', this)">אנשים דומים</button>
     </div>
 
     <div class="section report-tab-section active" id="overview-section">
@@ -595,6 +805,10 @@ def create_report(images_data, map_html, timeline_html, analysis):
                 <div class="stat-number">{total}</div>
                 <div class="stat-label">תמונות</div>
             </div>
+            <div class="section report-tab-section" id="similar-people-section">
+            <div class="section-title">זיהוי דמויות דומות</div>
+            {similar_people_section}
+        </div>
             <div class="stat-card">
                 <div class="stat-number">{gps_count}</div>
                 <div class="stat-label">עם GPS</div>
@@ -640,9 +854,53 @@ def create_report(images_data, map_html, timeline_html, analysis):
         {images_table}
     </div>
 
+
+</div>
+<div id="image-modal" style="
+display:none;
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.8);
+justify-content:center;
+align-items:center;
+z-index:999;
+">
+
+<img style="max-width:80%;max-height:80%;">
+
+</div>
+<div class="image-modal-overlay" id="image-modal-overlay" onclick="closeImageModal(event)">
+    <div class="image-modal-box" onclick="event.stopPropagation()">
+        <button type="button" class="image-modal-close" onclick="closeImageModal()">סגור</button>
+        <div class="image-gallery" id="image-gallery"></div>
+    </div>
+</div>
+<div id="image-modal" style="
+display:none;
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:rgba(0,0,0,0.85);
+justify-content:center;
+align-items:center;
+z-index:9999;
+">
+
+<img id="modal-img" style="
+max-width:80%;
+max-height:80%;
+border-radius:10px;
+box-shadow:0 0 20px black;
+">
+
 </div>
 
-<div class="report-footer">Image Intel &nbsp;|&nbsp; האקתון 2025</div>
+<div class="report-footer">Image Intel &nbsp;|&nbsp; האקתון 2026</div>
 <script>
 document.addEventListener("click", function (event) {{
     const link = event.target.closest(".coord-link");
@@ -709,6 +967,74 @@ function showTab(sectionId, buttonEl = null) {{
         }}
     }}
 }}
+</script>
+<script>
+const IMAGE_LOOKUP = {image_lookup_json};
+
+function openImageModal(filenames) {{
+    const overlay = document.getElementById("image-modal-overlay");
+    const gallery = document.getElementById("image-gallery");
+
+    if (!overlay || !gallery) return;
+
+    gallery.innerHTML = "";
+
+    filenames.forEach(filename => {{
+        const imageSrc = IMAGE_LOOKUP[filename];
+        if (!imageSrc) return;
+
+        const card = document.createElement("div");
+        card.className = "image-card";
+
+        card.innerHTML = `
+            <img src="${{imageSrc}}" alt="${{filename}}" data-filename="${{filename}}">
+            <div class="caption">${{filename}}</div>
+        `;
+
+        gallery.appendChild(card);
+    }});
+
+    overlay.classList.add("active");
+}}
+
+function closeImageModal(event = null) {{
+    if (event && event.target && !event.target.classList.contains("image-modal-overlay")) {{
+        return;
+    }}
+
+    const overlay = document.getElementById("image-modal-overlay");
+    const gallery = document.getElementById("image-gallery");
+
+    if (gallery) gallery.innerHTML = "";
+    if (overlay) overlay.classList.remove("active");
+}}
+</script>
+<script>
+
+document.addEventListener("click", function(e){{
+
+    if(!e.target.classList.contains("image-btn"))
+        return;
+
+    const filename = e.target.dataset.img;
+
+    const images = document.querySelectorAll("[data-filename]");
+
+    images.forEach(img => {{
+
+        if(img.dataset.filename === filename){{
+
+            const modal = document.getElementById("image-modal");
+
+            modal.querySelector("img").src = img.src;
+            modal.style.display = "flex";
+
+        }}
+
+    }});
+
+}});
+
 </script>
 </body>
 </html>"""

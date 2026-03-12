@@ -1,9 +1,10 @@
 import json
 from extractor import extract_all
-
+from detector import cosine_distance
 from pathlib import Path
 from collections import Counter
 from datetime import datetime
+
 
 def coords_to_location_key(lat, lon, precision=2):
     """
@@ -31,7 +32,11 @@ def analyze_behavior(dated_images):
 
     behavior_insights = []
 
-    hours = [int(img["datetime"].split()[1].split(":")[0]) for img in dated_images if " " in img["datetime"]]
+    hours = [
+        int(img["datetime"].split()[1].split(":")[0])
+        for img in dated_images
+        if img.get("datetime") and " " in img["datetime"]
+    ]
     night_shots = len([h for h in hours if h < 6 or h > 22])
     if hours and night_shots > len(hours) * 0.5:
         behavior_insights.append("זוהה דפוס פעילות לילי: חלק משמעותי מהתמונות צולמו בשעות המאוחרות.")
@@ -63,6 +68,52 @@ def get_device_insights(dated_images, unique_cameras):
     return insights
 
 
+def get_face_insights(images_data):
+    """
+    Generates insights based on detected faces in images.
+    Expects each image dict to contain:
+    - has_faces
+    - faces_count
+    """
+    if not images_data:
+        return []
+
+    insights = []
+
+    images_with_faces = [img for img in images_data if img.get("has_faces")]
+    total_faces = sum(img.get("faces_count", 0) for img in images_data)
+
+    if images_with_faces:
+        insights.append(f"זוהו פנים ב-{len(images_with_faces)} תמונות מתוך {len(images_data)}.")
+
+        if total_faces > 0:
+            insights.append(f"סה״כ זוהו {total_faces} פנים בכלל מאגר התמונות.")
+
+        max_faces_image = max(images_with_faces, key=lambda img: img.get("faces_count", 0))
+        max_faces_count = max_faces_image.get("faces_count", 0)
+
+        if max_faces_count > 0:
+            insights.append(
+                f'בתמונה "{max_faces_image.get("filename", "לא ידוע")}" '
+                f'זוהו {max_faces_count} פנים.'
+            )
+
+        crowded_images = [img for img in images_with_faces if img.get("faces_count", 0) >= 3]
+        if crowded_images:
+            crowded_filenames = [img.get("filename", "unknown") for img in crowded_images]
+
+            insights.append(
+                f"זוהו {len(crowded_images)} תמונות עם ריבוי פנים (3 או יותר), "
+                f"ייתכן שמדובר בתמונות קבוצה או אירוע."
+            )
+
+            insights.append(
+                f'תמונות עם ריבוי פנים: {", ".join(crowded_filenames)}.'
+            )
+
+    return insights
+
+
 def detect_location_revisits(images_with_gps):
     """
     Traces movement patterns to identify if a user returned to a previously visited area.
@@ -84,9 +135,9 @@ def detect_location_revisits(images_with_gps):
 
         if not location_visits or location_visits[-1]["location"] != location_key:
             location_visits.append({
-                "location": location_key,   # coordonnées arrondies pour détecter le retour
-                "lat": lat,                 # vraies coordonnées pour la map
-                "lon": lon,                 # vraies coordonnées pour la map
+                "location": location_key,
+                "lat": lat,
+                "lon": lon,
                 "datetime": img.get("datetime")
             })
 
@@ -114,6 +165,7 @@ def detect_location_revisits(images_with_gps):
                 )
 
     return insights
+
 
 def detect_time_gaps(dated_images, threshold_hours=12):
     """
@@ -155,6 +207,7 @@ def detect_time_gaps(dated_images, threshold_hours=12):
             )
 
     return insights
+
 
 def detect_geographic_clusters(images_with_gps, precision=2, min_images=3):
     """
@@ -199,7 +252,6 @@ def detect_geographic_clusters(images_with_gps, precision=2, min_images=3):
 
     insights = []
 
-    # Insight détaillée pour chaque cluster
     for cluster in significant_clusters:
         insights.append(
             f'זוהה ריכוז גיאוגרפי של {cluster["count"]} תמונות באזור '
@@ -208,7 +260,6 @@ def detect_geographic_clusters(images_with_gps, precision=2, min_images=3):
             f'{cluster["area"][0]}, {cluster["area"][1]}</a>.'
         )
 
-    # Insight OSINT principale sur le cluster dominant
     top_cluster = significant_clusters[0]
     insights.append(
         f'זוהה מוקד פעילות מרכזי באזור '
@@ -221,6 +272,126 @@ def detect_geographic_clusters(images_with_gps, precision=2, min_images=3):
     return insights
 
 
+def face_distance(sig1, sig2):
+    """
+    Cosine distance between two SFace embeddings.
+    Lower = more similar.
+    """
+    return cosine_distance(sig1, sig2)
+
+
+def detect_similar_face_groups(images_data, similarity_threshold=0.22, min_group_size=3):
+    """
+    Detects possible repeated faces across multiple images using SFace embeddings.
+
+    Strategy:
+    - build all detected faces
+    - assign a face to a group only if it matches enough faces already inside the group
+    - keep only meaningful groups
+    """
+    all_faces = []
+
+    for img in images_data:
+        signatures = img.get("face_signatures", []) or []
+        for signature in signatures:
+            all_faces.append({
+                "filename": img.get("filename", "unknown"),
+                "datetime": img.get("datetime"),
+                "latitude": img.get("latitude"),
+                "longitude": img.get("longitude"),
+                "signature": signature
+            })
+
+    if len(all_faces) < 2:
+        return []
+
+    groups = []
+
+    for face in all_faces:
+        matched_group = None
+
+        for group in groups:
+            distances = [
+                face_distance(face["signature"], member["signature"])
+                for member in group
+            ]
+
+            if not distances:
+                continue
+
+            strong_matches = [d for d in distances if d <= similarity_threshold]
+
+            # require at least one strong match for small groups,
+            # and at least two for bigger groups
+            if len(group) < 2:
+                if len(strong_matches) >= 1:
+                    matched_group = group
+                    break
+            else:
+                if len(strong_matches) >= 2:
+                    matched_group = group
+                    break
+
+        if matched_group is not None:
+            matched_group.append(face)
+        else:
+            groups.append([face])
+
+    # keep only meaningful groups
+    repeated_groups = []
+    for group in groups:
+        unique_files = {face["filename"] for face in group}
+        if len(unique_files) >= min_group_size:
+            repeated_groups.append(group)
+
+    # sort biggest first
+    repeated_groups.sort(key=lambda g: len({face["filename"] for face in g}), reverse=True)
+
+    return repeated_groups
+
+
+def get_face_reid_insights(images_data):
+    """
+    Generates OSINT-style insights for possible repeated individuals.
+    """
+    groups = detect_similar_face_groups(images_data, similarity_threshold=0.28)
+
+    for i, group in enumerate(groups, start=1):
+        print("GROUP", i, "SIZE =", len(group), flush=True)
+        print("FILES =", [face["filename"] for face in group], flush=True)
+
+    if not groups:
+        return []
+
+    insights = []
+
+    for idx, group in enumerate(groups[:3], start=1):
+        unique_files = sorted({face["filename"] for face in group})
+        count_images = len(unique_files)
+
+        if count_images >= 2:
+            insights.append(
+                f"ייתכן שאותו אדם הופיע ב-{count_images} תמונות שונות "
+                f"(קבוצת דמיון #{idx})."
+            )
+
+            if len(unique_files) <= 6:
+                insights.append(
+                    f'קבוצת דמיון #{idx} כוללת בין היתר את הקבצים: {", ".join(unique_files)}.'
+                )
+
+    strongest = max(groups, key=len)
+    strongest_files = len({face["filename"] for face in strongest})
+    if strongest_files >= 2:
+        insights.append(
+            "זוהתה אינדיקציה לדמות חוזרת במספר תמונות שונות — "
+            "נדרשת בדיקה ידנית לאימות."
+        )
+
+    return insights
+
+
+
 def analyze(images_data):
     """Main entry point that runs all analysis modules and aggregates the findings."""
     if not images_data:
@@ -228,6 +399,8 @@ def analyze(images_data):
             "total_images": 0,
             "images_with_gps": 0,
             "images_with_datetime": 0,
+            "images_with_faces": 0,
+            "total_faces_detected": 0,
             "unique_cameras": [],
             "date_range": {"start": None, "end": None},
             "insights": ["אין נתונים זמינים"]
@@ -235,6 +408,9 @@ def analyze(images_data):
 
     images_with_gps = [img for img in images_data if img.get("has_gps")]
     dated_images = [img for img in images_data if img.get("datetime")]
+    images_with_faces = [img for img in images_data if img.get("has_faces")]
+    total_faces_detected = sum(img.get("faces_count", 0) for img in images_data)
+
     cameras = list(set([img.get("camera_model") for img in images_data if img.get("camera_model")]))
 
     date_range = get_date_range(dated_images)
@@ -242,6 +418,11 @@ def analyze(images_data):
     insights.extend(analyze_behavior(dated_images))
     insights.extend(detect_time_gaps(dated_images))
     insights.extend(detect_geographic_clusters(images_with_gps))
+    insights.extend(get_face_insights(images_data))
+    insights.extend(get_face_reid_insights(images_data))
+    print("DEBUG FINAL INSIGHTS:", flush=True)
+    for insight in insights:
+        print("-", insight, flush=True)
 
     if images_with_gps:
         insights.append(f"מידע גיאוגרפי זמין עבור {len(images_with_gps)} תמונות. ניתן לבצע איכון.")
@@ -251,6 +432,8 @@ def analyze(images_data):
         "total_images": len(images_data),
         "images_with_gps": len(images_with_gps),
         "images_with_datetime": len(dated_images),
+        "images_with_faces": len(images_with_faces),
+        "total_faces_detected": total_faces_detected,
         "unique_cameras": cameras,
         "date_range": date_range,
         "insights": insights
