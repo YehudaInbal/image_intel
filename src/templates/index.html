@@ -5,6 +5,99 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Intel | האקתון 2026</title>
     <style>
+        #loading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(2, 6, 23, 0.96);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 99999;
+    backdrop-filter: blur(8px);
+}
+
+#loading-overlay.active {
+    display: flex;
+}
+
+.loading-box {
+    width: min(92%, 720px);
+    background: rgba(15, 23, 42, 0.96);
+    border: 1px solid rgba(56, 189, 248, 0.22);
+    border-radius: 22px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+    padding: 34px 28px;
+    text-align: center;
+}
+
+.loading-title {
+    color: #f8fafc;
+    font-size: 1.55rem;
+    font-weight: 800;
+    margin-bottom: 10px;
+    letter-spacing: 0.4px;
+}
+
+.loading-subtitle {
+    color: #94a3b8;
+    font-size: 0.98rem;
+    margin-bottom: 26px;
+}
+
+.loading-bar-wrapper {
+    width: 100%;
+    height: 30px;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.35);
+}
+
+.loading-bar-fill {
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #16a34a, #22c55e, #4ade80);
+    position: absolute;
+    right: 0;      /* ancrée à droite */
+    top: 0;
+    overflow: hidden;
+    transition: width 0.18s linear;
+    box-shadow: 0 0 20px rgba(34,197,94,0.35);
+}
+
+.binary-stream {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+    font-family: monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: #22c55e;   /* vert cyber */
+    padding: 0 10px;
+    letter-spacing: 1px;
+    text-shadow: 0 0 6px rgba(34,197,94,0.6);
+    animation: binaryMove 5s linear infinite;
+}
+
+.loading-percent {
+    margin-top: 18px;
+    color: #22c55e;
+    font-size: 1.15rem;
+    font-weight: 800;
+    text-shadow: 0 0 12px rgba(34,197,94,0.5);
+}
+
+@keyframes binaryMove {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-120px); }
+}
+
      .scan-line {
     position: fixed;
     top: 0;
@@ -541,6 +634,81 @@ createBinaryBackground();
 setInterval(animateBinaryBackground, 350);
 
 window.addEventListener("resize", createBinaryBackground);
+</script>
+<div id="loading-overlay">
+    <div class="loading-box">
+        <div class="loading-title">Image Intel Processing</div>
+        <div class="loading-subtitle">Scanning metadata · correlating movement · building intel report</div>
+
+        <div class="loading-bar-wrapper">
+            <div class="loading-bar-fill" id="loading-bar-fill">
+                <div class="binary-stream" id="binary-stream"></div>
+            </div>
+        </div>
+
+        <div class="loading-percent" id="loading-percent">0%</div>
+    </div>
+</div>
+<script>
+const loadingOverlay = document.getElementById("loading-overlay");
+const loadingBarFill = document.getElementById("loading-bar-fill");
+const loadingPercent = document.getElementById("loading-percent");
+const binaryStream = document.getElementById("binary-stream");
+const mainForm = document.querySelector("form");
+
+let loadingTimer = null;
+
+function makeBinaryString(length = 220) {
+    let result = "";
+    for (let i = 0; i < length; i++) {
+        result += Math.random() > 0.5 ? "1" : "0";
+        if (i % 6 === 0) result += " ";
+    }
+    return result;
+}
+
+function updateBinaryStream() {
+    if (binaryStream) {
+        binaryStream.textContent = makeBinaryString();
+    }
+}
+
+function startLoadingOverlay() {
+    if (!loadingOverlay || !loadingBarFill || !loadingPercent) return;
+
+    loadingOverlay.classList.add("active");
+    loadingBarFill.style.width = "0%";
+    loadingPercent.textContent = "0%";
+    updateBinaryStream();
+
+    let progress = 0;
+
+    if (loadingTimer) {
+        clearInterval(loadingTimer);
+    }
+
+    loadingTimer = setInterval(() => {
+        if (progress < 82) {
+            progress += Math.random() * 6;
+        } else if (progress < 93) {
+            progress += Math.random() * 1.4;
+        }
+
+        if (progress > 95) {
+            progress = 95;
+        }
+
+        loadingBarFill.style.width = progress + "%";
+        loadingPercent.textContent = Math.floor(progress) + "%";
+        updateBinaryStream();
+    }, 180);
+}
+
+if (mainForm) {
+    mainForm.addEventListener("submit", function () {
+        startLoadingOverlay();
+    });
+}
 </script>
 </body>
 </html>

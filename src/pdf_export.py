@@ -15,6 +15,8 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
+import re
+from html import unescape
 
 try:
     from bidi.algorithm import get_display
@@ -25,6 +27,30 @@ except Exception:
 PAGE_WIDTH, PAGE_HEIGHT = A4
 DEFAULT_FONT_NAME = "Helvetica"
 UNICODE_FONT_NAME = "DejaVuSans"
+
+def _strip_html_for_pdf(text):
+    """
+    Removes HTML tags and keeps readable text for PDF export.
+    Especially useful for anchor tags inserted in insights.
+    """
+    if not text:
+        return ""
+
+    value = str(text)
+
+    # replace anchor tags with just their visible text
+    value = re.sub(r'<a [^>]*>(.*?)</a>', r'\1', value)
+
+    # remove any remaining HTML tags
+    value = re.sub(r'<[^>]+>', '', value)
+
+    # unescape HTML entities
+    value = unescape(value)
+
+    # normalize spaces
+    value = re.sub(r'\s+', ' ', value).strip()
+
+    return value
 
 
 def _looks_like_hebrew(text: str) -> bool:
@@ -197,9 +223,9 @@ def _insights_story(analysis, styles):
 
     story = []
     for insight in insights:
-        style = styles["body_rtl"] if _looks_like_hebrew(str(insight)) else styles["body"]
-        story.append(Paragraph(f"• {_rtl_text(insight)}", style))
-        story.append(Spacer(1, 2))
+        clean_insight = _strip_html_for_pdf(insight)
+        style = styles["body_rtl"] if _looks_like_hebrew(str(clean_insight)) else styles["body"]
+        story.append(Paragraph(f"• {_rtl_text(clean_insight)}", style))
     return story
 
 
