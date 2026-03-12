@@ -1,5 +1,5 @@
 import json
-import src.extractor
+from extractor import extract_all
 
 from pathlib import Path
 from collections import Counter
@@ -159,7 +159,7 @@ def detect_time_gaps(dated_images, threshold_hours=12):
 def detect_geographic_clusters(images_with_gps, precision=2, min_images=3):
     """
     מזהה ריכוזים גיאוגרפיים לפי קואורדינטות מקורבות.
-    אם יש לפחות min_images תמונות באותו אזור - מחזיר תובנה עם קישור למפה.
+    אם יש לפחות min_images תמונות באותו אזור - מחזיר תובנות עם קישור למפה.
     """
     if not images_with_gps:
         return []
@@ -177,23 +177,46 @@ def detect_geographic_clusters(images_with_gps, precision=2, min_images=3):
         area_key = (round(lat, precision), round(lon, precision))
         area_counts[area_key] += 1
 
-        # שומר קואורדינטות מדויקות בשביל הזום במפה
         if area_key not in area_coords:
             area_coords[area_key] = (lat, lon)
 
-    insights = []
+    significant_clusters = []
 
     for area, count in area_counts.items():
         if count >= min_images:
-
             lat, lon = area_coords[area]
+            significant_clusters.append({
+                "area": area,
+                "count": count,
+                "lat": lat,
+                "lon": lon
+            })
 
-            insights.append(
-                f'זוהה ריכוז של {count} תמונות באזור '
-                f'<a href="#map-section" class="coord-link" '
-                f'data-lat="{lat}" data-lon="{lon}">'
-                f'{area[0]}, {area[1]}</a>.'
-            )
+    if not significant_clusters:
+        return []
+
+    significant_clusters.sort(key=lambda x: x["count"], reverse=True)
+
+    insights = []
+
+    # Insight détaillée pour chaque cluster
+    for cluster in significant_clusters:
+        insights.append(
+            f'זוהה ריכוז גיאוגרפי של {cluster["count"]} תמונות באזור '
+            f'<a href="#map-section" class="coord-link" '
+            f'data-lat="{cluster["lat"]}" data-lon="{cluster["lon"]}">'
+            f'{cluster["area"][0]}, {cluster["area"][1]}</a>.'
+        )
+
+    # Insight OSINT principale sur le cluster dominant
+    top_cluster = significant_clusters[0]
+    insights.append(
+        f'זוהה מוקד פעילות מרכזי באזור '
+        f'<a href="#map-section" class="coord-link" '
+        f'data-lat="{top_cluster["lat"]}" data-lon="{top_cluster["lon"]}">'
+        f'{top_cluster["area"][0]}, {top_cluster["area"][1]}</a> '
+        f'עם {top_cluster["count"]} תמונות משויכות.'
+    )
 
     return insights
 
@@ -238,7 +261,7 @@ if __name__ == "__main__":
     folder_path = Path(r"C:\Users\bgdps\OneDrive\Documents\Final project\image_intel\images")
 
     if folder_path.exists():
-        results = src.extractor.extract_all(folder_path) or []
+        results = extract_all(folder_path) or []
         print("\n--- תוצאות ניתוח מודיעיני ---")
         print(json.dumps(analyze(results), indent=4, ensure_ascii=False))
     else:

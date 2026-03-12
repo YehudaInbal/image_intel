@@ -161,7 +161,7 @@ def create_report(images_data, map_html, timeline_html, analysis):
             text-decoration: none;
             border-bottom: 1px dashed var(--accent);
         }}
-        
+
         .coord-link:hover {{
             color: var(--blue);
             border-bottom-color: var(--blue);
@@ -184,7 +184,7 @@ def create_report(images_data, map_html, timeline_html, analysis):
             --radius: 16px;
             --shadow: 0 8px 24px rgba(13, 27, 42, 0.08);
         }}
-    
+
 
         body {{
             font-family: 'Heebo', sans-serif;
@@ -410,7 +410,6 @@ def create_report(images_data, map_html, timeline_html, analysis):
             letter-spacing: 0.02em;
             white-space: nowrap;
         }}
-
         td {{
             padding: 12px 14px;
             border-bottom: 1px solid var(--border);
@@ -510,7 +509,7 @@ def create_report(images_data, map_html, timeline_html, analysis):
         .hidden-insight {{
             display: none;
         }}
-        
+
         .insights-toggle-btn {{
             align-self: flex-start;
             background: linear-gradient(135deg, var(--accent) 0%, var(--blue) 100%);
@@ -523,7 +522,7 @@ def create_report(images_data, map_html, timeline_html, analysis):
             cursor: pointer;
             box-shadow: 0 4px 12px rgba(27, 79, 114, 0.18);
         }}
-        
+
         .insights-toggle-btn:hover {{
             opacity: 0.92;
         }}
@@ -613,9 +612,7 @@ def create_report(images_data, map_html, timeline_html, analysis):
     </div>
 
     <div class="section report-tab-section" id="insights-section">
-    <div class="section-title">תובנות מרכזיות</div>
-    {insights_section}
-</div>
+        <div class="section-title">תובנות מרכזיות</div>
         {insights_section}
     </div>
 
@@ -715,50 +712,3 @@ function showTab(sectionId, buttonEl = null) {{
 </script>
 </body>
 </html>"""
-
-
-if __name__ == "__main__":
-    fake_images = [
-        {
-            "filename": "IMG_001.jpg",
-            "datetime": "2025:01:12 08:30:00",
-            "camera_make": "Samsung",
-            "camera_model": "Galaxy S23",
-            "has_gps": True,
-            "latitude": 32.0853,
-            "longitude": 34.7818,
-        },
-        {
-            "filename": "IMG_002.jpg",
-            "datetime": "2025:01:12 11:15:00",
-            "camera_make": "Apple",
-            "camera_model": "iPhone 15 Pro",
-            "has_gps": False,
-            "latitude": None,
-            "longitude": None,
-        },
-    ]
-
-    fake_analysis = {
-        "total_images": 2,
-        "images_with_gps": 1,
-        "images_with_datetime": 2,
-        "unique_cameras": ["Samsung Galaxy S23", "Apple iPhone 15 Pro"],
-        "date_range": {"start": "2025-01-12", "end": "2025-01-12"},
-        "insights": [
-            "נמצאו 2 מכשירים שונים.",
-            "תמונה אחת כוללת נתוני GPS.",
-        ],
-    }
-
-    html = create_report(
-        fake_images,
-        map_html="<html><body><div style='padding:20px;font-family:Arial'>[מפה תוצג כאן]</div></body></html>",
-        timeline_html="<div style='padding:20px'>[ציר זמן יוצג כאן]</div>",
-        analysis=fake_analysis,
-    )
-
-    with open("test_report.html", "w", encoding="utf-8") as f:
-        f.write(html)
-
-    print("✅ test_report.html נשמר")
