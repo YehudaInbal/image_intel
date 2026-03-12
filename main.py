@@ -14,6 +14,7 @@ def ensure_packages():
         "folium": "folium",
         "matplotlib": "matplotlib",
         "pytest": "pytest",
+        "reportlab": "reportlab",
     }
 
     for module, package in required_packages.items():

@@ -5,6 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Intel | האקתון 2026</title>
     <style>
+     .scan-line {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: rgba(0,255,120,0.4);
+    box-shadow: 0 0 10px #00ff66;
+    animation: scan 6s linear infinite;
+    pointer-events: none;
+    z-index: -1;
+}
+
+@keyframes scan {
+    0% { transform: translateY(-100px); }
+    100% { transform: translateY(100vh); }
+}
+
+
+        #binary-background {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    overflow: hidden;
+    z-index: -1;
+}
+
+.binary-grid {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 14px);
+    grid-auto-rows: 14px;
+
+    opacity: 0.25;
+    pointer-events: none;
+}
+
+.binary-cell {
+    color: #00ff66;
+    font-family: monospace;
+    font-size: 11px;
+    text-align: center;
+    line-height: 14px;
+    user-select: none;
+
+    text-shadow:
+        0 0 2px #00ff66,
+        0 0 6px #00ff66,
+        0 0 12px #00ff66;
+}
         :root {
             --bg-1: #020617;
             --bg-2: #0f172a;
@@ -158,7 +211,8 @@
             text-align: right;
         }
 
-        select {
+        select,
+        input[type="email"] {
             width: 100%;
             background: #0f172a;
             color: white;
@@ -169,7 +223,8 @@
             outline: none;
         }
 
-        select:focus {
+        select:focus,
+        input[type="email"]:focus {
             border-color: var(--accent);
             box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14);
         }
@@ -217,6 +272,16 @@
             display: none;
         }
 
+        .pdf-btn {
+            background: linear-gradient(90deg, #64748b, #94a3b8);
+            color: white;
+        }
+
+        .mail-btn {
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+            color: white;
+        }
+
         .submit-btn {
             width: 100%;
             border: none;
@@ -259,9 +324,9 @@
     </style>
 </head>
 <body>
+<div id="binary-background"></div>
+<div class="scan-line"></div>
     <div class="container">
-
-
         <div class="top-bar"></div>
 
         <div class="content">
@@ -308,7 +373,31 @@
                     </div>
                 </div>
 
-                <button type="submit" class="submit-btn">התחל ניתוח מודיעיני</button>
+                <div class="section-box">
+                    <label for="recipient_email">שליחת PDF למייל</label>
+                    <input
+                        type="email"
+                        name="recipient_email"
+                        id="recipient_email"
+                        placeholder="example@email.com"
+                    >
+                </div>
+
+                <div style="display:flex; gap:12px; margin-top:18px; flex-wrap:wrap;">
+                    <button type="submit" class="submit-btn" style="flex:1;">
+                        התחל ניתוח מודיעיני
+                    </button>
+
+                    <button type="submit" class="submit-btn pdf-btn" style="flex:1;"
+                        formaction="/export-pdf" formmethod="POST">
+                        ייצוא ל-PDF
+                    </button>
+
+                    <button type="submit" class="submit-btn mail-btn" style="flex:1;"
+                        formaction="/send-email" formmethod="POST">
+                        שלח PDF במייל
+                    </button>
+                </div>
             </form>
 
             <div class="footer-note">
@@ -412,5 +501,46 @@
 
         toggleSourceSections();
     </script>
+
+<script>
+function createBinaryBackground() {
+    const bg = document.getElementById("binary-background");
+    bg.innerHTML = "";
+
+    const grid = document.createElement("div");
+    grid.className = "binary-grid";
+
+    const cellSize = 14;
+    const cols = Math.ceil(window.innerWidth * 1.4 / cellSize);
+    const rows = Math.ceil(window.innerHeight * 1.4 / cellSize);
+    const total = cols * rows;
+
+    for (let i = 0; i < total; i++) {
+        const cell = document.createElement("span");
+        cell.className = "binary-cell";
+        cell.textContent = Math.random() > 0.5 ? "1" : "0";
+        grid.appendChild(cell);
+    }
+
+    bg.appendChild(grid);
+}
+
+function animateBinaryBackground() {
+    const cells = document.querySelectorAll(".binary-cell");
+    if (!cells.length) return;
+
+    const flips = Math.max(8, Math.floor(cells.length * 0.015));
+
+    for (let i = 0; i < flips; i++) {
+        const index = Math.floor(Math.random() * cells.length);
+        cells[index].textContent = cells[index].textContent === "0" ? "1" : "0";
+    }
+}
+
+createBinaryBackground();
+setInterval(animateBinaryBackground, 350);
+
+window.addEventListener("resize", createBinaryBackground);
+</script>
 </body>
 </html>
