@@ -19,5 +19,9 @@ def open_browser():
 
 if __name__ == "__main__":
     print("Image Intel démarre...")
-    threading.Timer(1.5, open_browser).start()
+    # threading.Timer(1.5, open_browser).start()
+    # app.run(debug=True, host="127.0.0.1", port=5000)
+    if os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+        threading.Timer(1.5, open_browser).start()
+
     app.run(debug=True, host="127.0.0.1", port=5000)

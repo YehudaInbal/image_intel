@@ -2,6 +2,8 @@ import json
 import src.extractor
 
 from pathlib import Path
+from collections import Counter
+from datetime import datetime
 
 def coords_to_location_key(lat, lon, precision=2):
     """
@@ -10,7 +12,7 @@ def coords_to_location_key(lat, lon, precision=2):
     """
     if lat is None or lon is None:
         return None
-    return (round(lat, precision), round(lon, precision))
+    return round(lat, precision), round(lon, precision)
 
 
 def get_date_range(dated_images):
@@ -113,9 +115,6 @@ def detect_location_revisits(images_with_gps):
 
     return insights
 
-from datetime import datetime
-
-
 def detect_time_gaps(dated_images, threshold_hours=12):
     """
     מזהה פערי זמן גדולים בין תמונות עוקבות.
@@ -156,9 +155,6 @@ def detect_time_gaps(dated_images, threshold_hours=12):
             )
 
     return insights
-
-
-from collections import Counter
 
 def detect_geographic_clusters(images_with_gps, precision=2, min_images=3):
     """

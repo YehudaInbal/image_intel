@@ -20,6 +20,7 @@ def index():
 
 @app.route("/analyze", methods=["POST"])
 def analyze_images():
+    images_data = []
     source_type = request.form.get("source_type", "project")
 
     if source_type == "project":
