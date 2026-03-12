@@ -7,6 +7,11 @@ import importlib
 
 
 def ensure_packages():
+    """
+    Vérifie si les packages nécessaires sont installés.
+    Sinon les installe automatiquement avec pip.
+    """
+
     required_packages = {
         "flask": "flask",
         "PIL": "Pillow",
@@ -15,16 +20,28 @@ def ensure_packages():
         "matplotlib": "matplotlib",
         "pytest": "pytest",
         "reportlab": "reportlab",
+        "cv2": "opencv-python",      # Face detection
+        "branca": "branca",          # requis par folium
+
     }
 
     for module, package in required_packages.items():
         try:
             importlib.import_module(module)
+
         except ImportError:
             print(f"[INFO] Installing missing package: {package}")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+
+            subprocess.check_call([
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                package
+            ])
 
 
+# installation automatique
 ensure_packages()
 
 
@@ -44,6 +61,13 @@ def open_browser():
 
 
 if __name__ == "__main__":
-    print("Image Intel démarre...")
+    print("Starting Image Intel...")
+    print("Verification des dependances...")
+
     threading.Timer(1.5, open_browser).start()
-    app.run(debug=True, host="127.0.0.1", port=5000)
+
+    app.run(
+        debug=True,
+        host="127.0.0.1",
+        port=5000
+    )

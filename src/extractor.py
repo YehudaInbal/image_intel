@@ -4,6 +4,10 @@ from pathlib import Path
 import re
 import base64
 import io
+from detector import detect_faces_in_image
+
+
+
 
 def sanitize_to_ascii(text):
     """
@@ -12,7 +16,6 @@ def sanitize_to_ascii(text):
     """
     if not text:
         return text
-    # This regex keeps standard printable ASCII characters and removes everything else
     return re.sub(r'[^\x20-\x7E]', '', text).strip()
 
 
@@ -93,6 +96,7 @@ def dms_to_decimal(dms_tuple, ref):
     except (TypeError, ZeroDivisionError, IndexError):
         return None
 
+
 def image_to_base64(image_path, max_size=(220, 220)):
     """Convertit une image en base64 pour l'afficher dans le popup HTML."""
     try:
@@ -111,41 +115,40 @@ def image_to_base64(image_path, max_size=(220, 220)):
         return None
 
 
-    
 def extract_metadata(image_path):
     """
     Extracts EXIF from a single image and builds a comprehensive data dictionary.
     """
     path = Path(image_path)
 
-    # Pre-sanitize the filename so it's ready for both Success and Error cases
     safe_filename = sanitize_to_ascii(path.name)
     if not safe_filename or safe_filename.startswith('.'):
-        # Generate a fallback name if the original was Hebrew
         safe_filename = f"image_id_{path.stem.encode('utf-8').hex()[:8]}{path.suffix}"
+
+    face_data = detect_faces_in_image(image_path)
 
     try:
         with Image.open(image_path) as img:
             exif = img.getexif()
             if not exif:
                 raise ValueError("No EXIF found")
+
             full_data = {}
-            # Root EXIF tags
+
             for tag_id, value in exif.items():
                 tag = TAGS.get(tag_id, tag_id)
                 full_data[tag] = value
 
-            # GPS IFD tags
             gps_ifd = exif.get_ifd(0x8825)
             for tag_id, value in gps_ifd.items():
                 tag = GPSTAGS.get(tag_id, tag_id)
                 full_data[tag] = value
 
-            # Extended EXIF IFD tags
             exif_ifd = exif.get_ifd(0x8769)
             for tag_id, value in exif_ifd.items():
                 tag = TAGS.get(tag_id, tag_id)
                 full_data[tag] = value
+            print("FACES:", safe_filename, face_data["faces_count"], len(face_data["face_signatures"]))
 
             return {
                 "filename": safe_filename,
@@ -155,10 +158,15 @@ def extract_metadata(image_path):
                 "camera_make": camera_make(full_data),
                 "camera_model": camera_model(full_data),
                 "has_gps": has_gps(full_data),
-                "image_base64": image_to_base64(image_path)
+                "image_base64": image_to_base64(image_path),
+                "has_faces": face_data["has_faces"],
+                "faces_count": face_data["faces_count"],
+                "faces_boxes": face_data["faces_boxes"],
+                "face_signatures": face_data["face_signatures"],
             }
 
     except Exception:
+        print("FACES:", safe_filename, face_data["faces_count"], len(face_data["face_signatures"]))
         return {
             "filename": safe_filename,
             "datetime": None,
@@ -167,14 +175,19 @@ def extract_metadata(image_path):
             "camera_make": None,
             "camera_model": None,
             "has_gps": False,
-            "image_base64": image_to_base64(image_path)
-        }
+            "image_base64": image_to_base64(image_path),
+            "has_faces": face_data["has_faces"],
+            "faces_count": face_data["faces_count"],
+            "faces_boxes": face_data["faces_boxes"],
+            "face_signatures": face_data["face_signatures"],
 
+        }
 
 
 
 def extract_all(folder_path):
     """Extracts metadata from all JPG files in a folder."""
+
     all_metadata = []
     folder = Path(folder_path)
 
@@ -182,7 +195,7 @@ def extract_all(folder_path):
         return []
 
     for path in folder.glob("*"):
-        if path.is_file() and path.suffix.lower() in ['.jpg', '.jpeg','.png']:
+        if path.is_file() and path.suffix.lower() in ['.jpg', '.jpeg', '.png']:
             metadata = extract_metadata(path)
             all_metadata.append(metadata)
 
