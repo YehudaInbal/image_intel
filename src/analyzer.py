@@ -169,8 +169,8 @@ def detect_location_revisits(images_with_gps):
 
 def detect_time_gaps(dated_images, threshold_hours=12):
     """
-    מזהה פערי זמן גדולים בין תמונות עוקבות.
-    מחזיר רשימת תובנות בעברית.
+    Detects large time gaps between consecutive images.
+    Returns a list of insights in Hebrew.
     """
     if len(dated_images) < 2:
         return []
@@ -211,8 +211,8 @@ def detect_time_gaps(dated_images, threshold_hours=12):
 
 def detect_geographic_clusters(images_with_gps, precision=2, min_images=3):
     """
-    מזהה ריכוזים גיאוגרפיים לפי קואורדינטות מקורבות.
-    אם יש לפחות min_images תמונות באותו אזור - מחזיר תובנות עם קישור למפה.
+    Identifies geographic concentrations by approximate coordinates.
+    If there are at least min_images images in the same area - returns insights with a link to a map.
     """
     if not images_with_gps:
         return []
@@ -389,7 +389,6 @@ def get_face_reid_insights(images_data):
         )
 
     return insights
-
 
 
 def analyze(images_data):

@@ -1,10 +1,7 @@
 """
-map_view.py - יצירת מפה אינטראקטיבית
-צוות 1, זוג B
+map_view.py - Create an interactive map
 """
-
 from collections import Counter
-
 from extractor import extract_all
 from branca.element import Element
 import folium
@@ -17,11 +14,11 @@ def sort_by_time(arr):
 
 def create_map(images_data):
     """
-    יוצר מפה אינטראקטיבית עם:
-    - סמנים לכל תמונה
-    - מסלול כרונולוגי מקווקו ונע
-    - זיהוי hotspots גיאוגרפיים
-    - heatmap של צפיפות מיקומים
+    Creates an interactive map with:
+    - Markers for each image
+    - Moving dotted chronological track
+    - Geographic hotspot detection
+    - Heatmap of location density
     """
     gps_images = [
         img for img in images_data
